@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, FileText, GraduationCap, Home, PlayCircle, ExternalLink, ChevronRight, Download, CheckCircle, ArrowLeft, File, Presentation, Search, X, Menu, ChevronDown } from "lucide-react";
+import { BookOpen, FileText, GraduationCap, Home, PlayCircle, ExternalLink, ChevronRight, Download, CheckCircle, ArrowLeft, File, Presentation, Search, X, Menu, ChevronDown, Sparkles, Send, Trash2 } from "lucide-react";
 // import SecurePdfViewer from "./components/SecurePDFViewer";
 
 import dynamic from "next/dynamic";
@@ -10,15 +10,8 @@ const SecurePDFViewer = dynamic(
   () => import("./components/SecurePDFViewer"),
   { ssr: false }
 );
-
-
-
 const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_URL || "http://3.6.27.148/strapi";
-// Your production app is served under http://3.6.27.148/strapi-front
-// so API routes must be called as /strapi-front/api/...
-// (This avoids needing env vars on the server.)
-const HARDCODED_APP_BASE_PATH = "/strapi-front";
-
+const HARDCODED_APP_BASE_PATH = "/";
 const joinPath = (...parts) =>
   parts
     .filter(Boolean)
@@ -27,8 +20,6 @@ const joinPath = (...parts) =>
     .replace(/\/$/, "") || "/";
 
 const detectBasePath = () => {
-  // If running under /strapi-front/... keep that prefix for API calls
-  // Fallback: use the hardcoded value if present.
   try {
     const path = window.location.pathname || "/";
     if (path.startsWith("/strapi-front")) return "/strapi-front";
@@ -402,11 +393,125 @@ const FileViewer = ({ file, allowDownload = false }) => {
   );
 };
 
+const AIChatPanel = ({
+  open,
+  onClose,
+  messages,
+  input,
+  setInput,
+  onSend,
+  onClear,
+}) => {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex lg:justify-end">
+      {/* Backdrop (mobile/tablet) */}
+      <div
+        className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm lg:hidden"
+        onClick={onClose}
+      />
+
+      {/* Panel */}
+      <section className="relative ml-auto flex h-full w-full max-w-full flex-col border-l border-slate-200/70 bg-white/95 backdrop-blur-sm shadow-2xl lg:w-[420px]">
+        <div className="flex items-center gap-3 border-b border-slate-200/70 bg-gradient-to-r from-indigo-50 via-blue-50 to-purple-50 px-4 py-3">
+          <div className="rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 p-2 shadow-sm">
+            <Sparkles className="h-4 w-4 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-slate-800">AI Mode</p>
+            <p className="text-xs text-slate-500">Ask anything about the course content</p>
+          </div>
+          <button
+            onClick={onClear}
+            className="rounded-lg px-2.5 py-2 text-slate-500 hover:bg-slate-100/80 transition"
+            title="Clear chat"
+            type="button"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg px-2.5 py-2 text-slate-500 hover:bg-slate-100/80 transition"
+            title="Close"
+            type="button"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {messages.length === 0 ? (
+            <div className="mt-10 rounded-xl border border-slate-200/70 bg-gradient-to-br from-slate-50 to-blue-50/30 p-6 text-center">
+              <p className="text-sm font-semibold text-slate-800">Start a conversation</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Try: “Summarize this lesson”, “Create a quiz”, “Explain this topic simply”.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((m) => {
+                const isUser = m.role === "user";
+                return (
+                  <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${
+                        isUser
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+                          : "border border-slate-200/70 bg-white text-slate-800"
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSend();
+          }}
+          className="border-t border-slate-200/70 bg-white/80 px-4 py-3"
+        >
+          <div className="flex items-end gap-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask a question…"
+              rows={1}
+              className="min-h-[44px] max-h-36 flex-1 resize-none rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300/40"
+            />
+            <button
+              type="submit"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 text-sm font-semibold text-white shadow-md transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50"
+              disabled={!input.trim()}
+              title="Send"
+            >
+              <Send className="h-4 w-4" />
+              <span className="hidden sm:inline">Send</span>
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Tip: Shift+Enter for a new line. (This demo doesn’t call an AI API yet.)
+          </p>
+        </form>
+      </section>
+    </div>
+  );
+};
+
 export default function LMSApp() {
   const [courses, setCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [error, setError] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiInput, setAiInput] = useState("");
 
   const [activeCourseId, setActiveCourseId] = useState(null);
   const [activeModuleId, setActiveModuleId] = useState(null);
@@ -497,6 +602,35 @@ export default function LMSApp() {
     const moduleDocumentId = moduleMeta?.documentId;
     await fetchLessonsForModule(moduleId, moduleDocumentId);
   };
+
+ const handleCourseSelect = async (course) => {
+  // 👉 If already open, close it
+  if (activeCourseId === course.id) {
+    setActiveCourseId(null);
+    setActiveModuleId(null);
+    setSelectedLesson(null);
+    setSelectedDocument(null);
+    return;
+  }
+
+  // 👉 Open new course
+  setActiveCourseId(course.id);
+  setSelectedLesson(null);
+  setSelectedDocument(null);
+
+  const firstModule = course.modules?.[0] || null;
+  if (!firstModule) {
+    setActiveModuleId(null);
+    return;
+  }
+
+  setActiveModuleId(firstModule.id);
+
+  if (!lessonsByModule[firstModule.id]) {
+    await fetchLessonsForModule(firstModule.id, firstModule.documentId);
+  }
+};
+
 
   useEffect(() => {
     if (!activeCourse) return;
@@ -871,6 +1005,47 @@ export default function LMSApp() {
     };
   }, [selectedDocument]);
 
+  // Basic body scroll lock when AI panel is open on mobile
+  useEffect(() => {
+    if (!aiOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [aiOpen]);
+
+  const getAiContext = () => {
+    const courseTitle = activeCourse?.title ? `Course: ${activeCourse.title}` : "";
+    const moduleTitle = activeModule?.title ? `Module: ${activeModule.title}` : "";
+    const lessonTitle = selectedLesson?.title ? `Lesson: ${selectedLesson.title}` : "";
+    const docTitle = selectedDocument?.type ? `Document: ${selectedDocument.type}` : "";
+    return [courseTitle, moduleTitle, lessonTitle, docTitle].filter(Boolean).join(" • ");
+  };
+
+  const sendAiMessage = () => {
+    const text = aiInput.trim();
+    if (!text) return;
+    const now = Date.now();
+    const context = getAiContext();
+
+    setAiMessages((prev) => [
+      ...prev,
+      { id: `u-${now}`, role: "user", content: text },
+      {
+        id: `a-${now + 1}`,
+        role: "assistant",
+        content: `I’m in demo mode (UI only). You asked: “${text}”\n${context ? `\nContext: ${context}` : ""}\n\nIf you want, I can wire this to a real AI API next.`,
+      },
+    ]);
+    setAiInput("");
+  };
+
+  const clearAiChat = () => {
+    setAiMessages([]);
+    setAiInput("");
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/20">
       {sidebarOpen && (
@@ -890,8 +1065,15 @@ export default function LMSApp() {
                 <GraduationCap className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
-                <h1 className="text-base font-bold text-slate-800">Steps Robotics</h1>
-                <p className="text-xs text-slate-500">Learning Platform</p>
+                <div className="relative h-10 w-28 overflow-hidden rounded-md">
+                  <Image
+                    src="/logo.png"
+                    alt="Learning Platform Logo"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                </div>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
@@ -935,8 +1117,9 @@ export default function LMSApp() {
                     }`}
                   >
                     <button
-                      onClick={() => setActiveCourseId(course.id)}
+                      onClick={() => handleCourseSelect(course)}
                       className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left"
+                      type="button"
                     >
                       <div className={`rounded-md p-1.5 transition-all ${
                         isActiveCourse 
@@ -984,7 +1167,7 @@ export default function LMSApp() {
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm shadow-sm">
+        <header className="relative z-50 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm shadow-sm">
           <div className="flex items-center gap-4 px-4 py-3">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -1015,7 +1198,7 @@ export default function LMSApp() {
               )}
 
               {searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 max-h-96 overflow-y-auto rounded-lg border border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-xl">
+                <div className="absolute top-full left-0 right-0 z-[80] mt-2 max-h-96 overflow-y-auto rounded-lg border border-slate-200/80 bg-white/95 backdrop-blur-sm shadow-xl">
                   {searchResults.map((result, idx) => {
                     const icons = { course: BookOpen, module: FileText, lesson: PlayCircle };
                     const Icon = icons[result.type];
@@ -1057,6 +1240,16 @@ export default function LMSApp() {
                 </>
               )}
             </div>
+
+            <button
+              onClick={() => setAiOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300/40"
+              type="button"
+              title="Open AI Mode"
+            >
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <span className="hidden sm:inline">AI Mode</span>
+            </button>
           </div>
         </header>
 
@@ -1266,6 +1459,16 @@ export default function LMSApp() {
           )}
         </div>
       </div>
+
+      <AIChatPanel
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        messages={aiMessages}
+        input={aiInput}
+        setInput={setAiInput}
+        onSend={sendAiMessage}
+        onClear={clearAiChat}
+      />
     </div>
   );
 }
