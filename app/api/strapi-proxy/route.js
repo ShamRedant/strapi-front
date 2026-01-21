@@ -29,6 +29,9 @@ export async function GET(request) {
       url.searchParams.append(key, value);
     });
 
+    console.log(`[Strapi Proxy] Fetching: ${url.toString()}`);
+    console.log(`[Strapi Proxy] STRAPI_BASE: ${STRAPI_BASE}`);
+
     const res = await fetch(url.toString(), {
       headers: {
         'Accept': 'application/json',
@@ -36,27 +39,38 @@ export async function GET(request) {
       cache: 'no-store',
     });
 
+    console.log(`[Strapi Proxy] Response status: ${res.status}`);
+
     if (!res.ok) {
       const errorText = await res.text();
-      console.error("Strapi API Error:", res.status, errorText);
+      console.error("[Strapi Proxy] API Error:", res.status, errorText);
       return NextResponse.json(
-        { error: "Upstream error", status: res.status, details: errorText },
+        { error: "Upstream error", status: res.status, details: errorText, url: url.toString() },
         { status: res.status }
       );
     }
 
     const data = await res.json();
+    console.log(`[Strapi Proxy] Success: ${path}`);
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store',
       },
     });
   } catch (err) {
-    console.error("Proxy failed:", err);
+    console.error("[Strapi Proxy] Fetch failed:", err.message);
+    console.error("[Strapi Proxy] Error stack:", err.stack);
+    console.error("[Strapi Proxy] STRAPI_BASE:", STRAPI_BASE);
     return NextResponse.json(
-      { error: "Proxy failed", details: err.message },
+      { 
+        error: "Proxy failed", 
+        details: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        strapiBase: STRAPI_BASE
+      },
       { status: 500 }
     );
   }
 }
+
 

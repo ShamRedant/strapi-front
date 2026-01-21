@@ -1,9 +1,40 @@
 "use client";
-
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, FileText, GraduationCap, Home, PlayCircle, ExternalLink, ChevronRight, Download, CheckCircle, ArrowLeft, File, Presentation, Search, X, Menu, ChevronDown } from "lucide-react";
+// import SecurePdfViewer from "./components/SecurePDFViewer";
+
+import dynamic from "next/dynamic";
+
+const SecurePDFViewer = dynamic(
+  () => import("./components/SecurePDFViewer"),
+  { ssr: false }
+);
+
+
 
 const STRAPI_URL = process.env.NEXT_PUBLIC_STRAPI_URL || "http://3.6.27.148/strapi";
+// Your production app is served under http://3.6.27.148/strapi-front
+// so API routes must be called as /strapi-front/api/...
+// (This avoids needing env vars on the server.)
+const HARDCODED_APP_BASE_PATH = "/strapi-front";
+
+const joinPath = (...parts) =>
+  parts
+    .filter(Boolean)
+    .join("/")
+    .replace(/\/{2,}/g, "/")
+    .replace(/\/$/, "") || "/";
+
+const detectBasePath = () => {
+  // If running under /strapi-front/... keep that prefix for API calls
+  // Fallback: use the hardcoded value if present.
+  try {
+    const path = window.location.pathname || "/";
+    if (path.startsWith("/strapi-front")) return "/strapi-front";
+  } catch {}
+  return HARDCODED_APP_BASE_PATH || "";
+};
 
 const buildMediaUrl = (url) => {
   if (!url) return "";
@@ -80,7 +111,9 @@ const normalizeCourse = (course) => {
 async function fetchFromStrapi(path, params = {}) {
   try {
     // Use proxy route to handle CORS issues
-    const proxyUrl = new URL('/api/strapi-proxy', window.location.origin);
+    const basePath = detectBasePath();
+    const proxyPath = joinPath(basePath, "api/strapi-proxy");
+    const proxyUrl = new URL(proxyPath.startsWith("/") ? proxyPath : `/${proxyPath}`, window.location.origin);
     proxyUrl.searchParams.append('path', path);
     
     // Add all params to proxy URL
@@ -90,6 +123,8 @@ async function fetchFromStrapi(path, params = {}) {
       }
     });
 
+    console.log(`[Client] Fetching via proxy: ${proxyUrl.toString()}`);
+
     const res = await fetch(proxyUrl.toString(), { 
       cache: "no-store",
       headers: {
@@ -97,17 +132,29 @@ async function fetchFromStrapi(path, params = {}) {
       },
     });
     
+    console.log(`[Client] Proxy response status: ${res.status}`);
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to fetch ${path}: ${res.status} ${res.statusText}`);
+      console.error('[Client] Proxy error response:', errorData);
+      const errorMsg = errorData.error || errorData.details || `Failed to fetch ${path}: ${res.status} ${res.statusText}`;
+      throw new Error(`${errorMsg}${errorData.url ? ` (URL: ${errorData.url})` : ''}`);
     }
     
     const json = await res.json();
+    console.log(`[Client] Success: ${path}`);
     return json?.data ?? [];
   } catch (error) {
-    console.error('Fetch error:', error);
+    console.error('[Client] Fetch error:', error);
+    console.error('[Client] Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
+    
+    // Provide more specific error messages
     if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-      throw new Error(`Network error: Cannot connect to Strapi API. Please check if the server is running.`);
+      throw new Error(`Network error: Cannot connect to API proxy at ${window.location.origin}/api/strapi-proxy. Check server logs for details.`);
     }
     throw error;
   }
@@ -126,7 +173,14 @@ const FileViewer = ({ file, allowDownload = false }) => {
 
   const isPDF = file.mime === "application/pdf" || file.ext === ".pdf";
   const isVideo = file.mime?.startsWith("video/");
-  const proxiedUrl = `/api/proxy-file?url=${encodeURIComponent(file.url)}`;
+  const basePath = (() => {
+    try {
+      return detectBasePath();
+    } catch {
+      return HARDCODED_APP_BASE_PATH || "";
+    }
+  })();
+  const proxiedUrl = `${joinPath(basePath, "api/proxy-file")}?url=${encodeURIComponent(file.url)}`;
 
   const handleContextMenu = (e) => {
     if (!allowDownload) {
@@ -280,70 +334,32 @@ const FileViewer = ({ file, allowDownload = false }) => {
     );
   }
 
+
   if (isPDF) {
     return (
-      <div 
-        className="flex h-full flex-col select-none"
-        onContextMenu={handleContextMenu}
-        onKeyDown={handleKeyDown}
-        onKeyUp={handleKeyDown}
-        onCopy={handleCopy}
-        onCut={handleCut}
-        onSelect={handleSelect}
-        onMouseUp={handleMouseUp}
-        onDragStart={handleDragStart}
-        style={{ userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}
-      >
-        <div className="flex items-center justify-between border-b border-slate-100 bg-white/80 backdrop-blur-sm px-4 py-3">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-slate-500" />
-            <span className="text-sm font-medium text-slate-700">{file.name}</span>
-            {!allowDownload && (
-              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                View Only
-              </span>
-            )}
-          </div>
-          {allowDownload ? (
-            <a
-              href={file.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-3 py-1.5 text-sm font-medium text-white transition hover:from-blue-600 hover:to-indigo-600 shadow-sm"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Open
-            </a>
-          ) : (
-            <span className="text-xs text-slate-500 italic">Download not allowed</span>
-          )}
-        </div>
-        <div className="flex-1 relative">
-          <iframe
-            title={file.name}
-            src={proxiedUrl}
-            className="w-full h-full bg-white"
-            style={{ pointerEvents: 'auto' }}
-            onContextMenu={handleContextMenu}
-          />
-          {!allowDownload && (
-            <div 
-              className="absolute inset-0 pointer-events-none z-10"
-              style={{ 
-                background: 'transparent',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                MozUserSelect: 'none',
-                msUserSelect: 'none'
-              }}
-              onContextMenu={handleContextMenu}
-              onCopy={handleCopy}
-              onCut={handleCut}
-              onSelect={handleSelect}
-              onMouseUp={handleMouseUp}
-            />
-          )}
-        </div>
+      <div className="flex h-full flex-col gap-3">
+        {/* <iframe
+          title={file.name}
+          src={`${proxiedUrl}#toolbar=0&navpanes=0`}
+          className="flex-1 rounded-lg border border-slate-200 bg-white"
+        /> */}
+        
+        <SecurePDFViewer
+          url={proxiedUrl}
+          // watermark={`santhosh.kumar • ${new Date().toLocaleString()}`}
+          className="flex-1 rounded-lg border border-slate-200 bg-white"
+          highlightText="robot"
+        />
+        {/* <a
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+        >
+          <ExternalLink className="h-4 w-4" />
+          Open in New Tab
+        </a> */}
+        
       </div>
     );
   }

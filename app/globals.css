@@ -24,3 +24,23 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+:fullscreen {
+  background: #f8fafc;
+}
+
+:-webkit-full-screen {
+  background: #f8fafc;
+}
+
+.fullscreen-pdf canvas {
+  margin: auto;
+  max-width: 100%;
+}
+
+.textLayer span {
+  user-select: none;
+  pointer-events: none;
+}
+
+

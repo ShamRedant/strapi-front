@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 
 const STRAPI_BASE = process.env.NEXT_PUBLIC_STRAPI_URL || "http://3.6.27.148/strapi";
 
+// Extract host from STRAPI_BASE URL
+const strapiHost = (() => {
+  try {
+    const baseUrl = STRAPI_BASE.endsWith('/') ? STRAPI_BASE.slice(0, -1) : STRAPI_BASE;
+    return new URL(baseUrl).host;
+  } catch {
+    return "3.6.27.148"; // fallback
+  }
+})();
+
 const ALLOWED_HOSTS = [
-  new URL(STRAPI_BASE).host,
+  strapiHost,
   "steps-robotics-dev.s3.ap-south-1.amazonaws.com",
   "s3.ap-south-1.amazonaws.com",
 ];
@@ -49,3 +59,4 @@ export async function GET(request) {
     return NextResponse.json({ error: "Proxy failed" }, { status: 500 });
   }
 }
+
